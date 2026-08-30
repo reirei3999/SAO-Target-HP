@@ -217,16 +217,27 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         }
 
         float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
+        // Use the target's current HP for the warning colour, while retaining the smooth fill animation.
+        float currentHp = target == null ? hp : healthRatio(target);
+        int fillColor = 0xFF58A83B;
+        int highlightColor = 0xFF83D25B;
+        if (currentHp <= 0.20f) {
+            fillColor = 0xFFD9413A;
+            highlightColor = 0xFFFF7666;
+        } else if (currentHp <= 0.40f) {
+            fillColor = 0xFFE0AF32;
+            highlightColor = 0xFFFFDD69;
+        }
         float fillRight = innerLeft + innerWidth * hp;
         if (fillRight > innerLeft) {
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, innerBottom,
                     Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.018f,
-                    withAlpha(0xFF58A83B, alpha));
+                    withAlpha(fillColor, alpha));
 
             float highlightBottom = innerTop - Math.max(0.015f, pinSize * 0.08f);
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, highlightBottom,
                     Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.020f,
-                    withAlpha(0xFF83D25B, alpha * 0.72f));
+                    withAlpha(highlightColor, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
