@@ -28,6 +28,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     private static final float SLIDE_SPEED = 0.20f;
     private static final float HEALTH_FOLLOW = 0.24f;
     private static final float DAMAGE_TRAIL_FOLLOW = 0.045f;
+    private static final double HEALTH_BAR_VERTICAL_OFFSET = 2.0D;
 
     private static LivingEntity target;
     private static float alpha;
@@ -156,15 +157,19 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float size = (float) Math.max(0.22D, Math.min(0.70D, 0.28D + distance * 0.0032D)) * pulse;
         float pinAlpha = alpha * 0.92f;
 
+        VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
+
+        // Offset the gauge two blocks downward in world space, then rotate it to face the player.
+        matrices.push();
+        matrices.translate(x, y - HEALTH_BAR_VERTICAL_OFFSET, z);
+        matrices.multiply(camera.getRotation());
+        drawTargetHealthBar(consumer, matrices, size);
+        matrices.pop();
+
+        // The pin remains above the target and is also camera-facing.
         matrices.push();
         matrices.translate(x, y, z);
         matrices.multiply(camera.getRotation());
-
-        VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
-
-        // The HP gauge is camera-facing and placed directly to the left of the pin.
-        drawTargetHealthBar(consumer, matrices, size);
-
         // Dark outer diamond.
         drawDiamond(consumer, matrices, size * 1.16f, 0xB0000000);
         // SAO-like red inner diamond.
