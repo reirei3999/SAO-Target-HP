@@ -2,11 +2,8 @@ package dev.sao.targethp;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.render.RenderTickCounter;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
@@ -20,18 +17,12 @@ import net.minecraft.world.RaycastContext;
 import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.WitherEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
 import net.minecraft.util.hit.HitResult;
 
 /**
  * Client-only SAO-inspired target HUD. All visuals are procedurally drawn.
  */
 public final class SaoTargetHpClient implements ClientModInitializer {
-    public static final int BAR_WIDTH = 250;
-    private static final int BAR_HEIGHT = 8;
-    // The reference layout places the HP bar above the target name.
-    private static final int BAR_Y = 30;
-    private static final int NAME_Y = 43;
     private static final double TARGET_RANGE = 128.0D;
     private static final float FADE_SPEED = 0.16f;
     private static final float SLIDE_SPEED = 0.20f;
@@ -49,7 +40,6 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientTickEvents.END_CLIENT_TICK.register(SaoTargetHpClient::tick);
-        HudRenderCallback.EVENT.register(SaoTargetHpClient::renderHud);
         WorldRenderEvents.AFTER_ENTITIES.register(SaoTargetHpClient::renderTargetPin);
     }
 
@@ -144,86 +134,6 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         return Math.max(0.0f, Math.min(1.0f, entity.getHealth() / max));
     }
 
-    private static void renderHud(DrawContext ctx, RenderTickCounter tickCounter) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (target == null || alpha <= 0.0f || client.player == null) return;
-
-        int width = client.getWindow().getScaledWidth();
-        int center = width / 2;
-        float eased = easeOutCubic(slide);
-        int offset = Math.round((1.0f - eased) * 34.0f);
-        int centerX = center + offset;
-        int left = centerX - BAR_WIDTH / 2;
-        int right = left + BAR_WIDTH;
-
-        String name = target.getDisplayName().getString();
-        int nameWidth = client.textRenderer.getWidth(name);
-        int nameX = centerX - nameWidth / 2;
-        int nameY = NAME_Y;
-
-        int white = withAlpha(0xFFF4F4F4, alpha);
-        int gold = withAlpha(0xFFE8D59A, alpha);
-        int goldBright = withAlpha(0xFFFFEAB0, alpha);
-        int dark = withAlpha(0xE6000000, alpha * 0.96f);
-        int frame = withAlpha(0xFFAAA79F, alpha * 0.92f);
-        int inner = withAlpha(0xFF151515, alpha);
-        int empty = withAlpha(0xFF353535, alpha);
-        float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
-        int fill;
-        int fillHighlight;
-        if (hp <= 0.20f) {
-            fill = withAlpha(0xFFE04444, alpha);
-            fillHighlight = withAlpha(0xFFFF9A9A, alpha * 0.90f);
-        } else if (hp <= 0.40f) {
-            fill = withAlpha(0xFFE8B83F, alpha);
-            fillHighlight = withAlpha(0xFFFFE49A, alpha * 0.90f);
-        } else {
-            fill = withAlpha(0xFF74C51C, alpha);
-            fillHighlight = withAlpha(0xFFB7F06A, alpha * 0.90f);
-        }
-        int trail = withAlpha(0xFFDB8A3A, alpha * 0.82f);
-
-        // Nameplate.
-        ctx.drawText(client.textRenderer, Text.literal(name), nameX, nameY, white, true);
-
-        // SAO-like target brackets and central lock accent.
-        drawCorner(ctx, left - 13, BAR_Y - 5, false, gold);
-        drawCorner(ctx, right + 13, BAR_Y - 5, true, gold);
-        ctx.fill(centerX - 1, BAR_Y + BAR_HEIGHT + 6, centerX + 1, BAR_Y + BAR_HEIGHT + 12, goldBright);
-        ctx.fill(centerX - 5, BAR_Y + BAR_HEIGHT + 10, centerX + 5, BAR_Y + BAR_HEIGHT + 11, gold);
-
-        // Subtle acquisition pulse.
-        if (acquirePulse > 0.02f) {
-            int pulse = withAlpha(0xFFF6E3A6, alpha * acquirePulse * 0.22f);
-            int pulsePad = Math.round(3.0f + acquirePulse * 7.0f);
-            ctx.fill(left - pulsePad, BAR_Y - pulsePad, right + pulsePad, BAR_Y - pulsePad + 1, pulse);
-        }
-
-        // Layered frame.
-        ctx.fill(left - 5, BAR_Y - 5, right + 5, BAR_Y + BAR_HEIGHT + 5, dark);
-        ctx.fill(left - 3, BAR_Y - 3, right + 3, BAR_Y + BAR_HEIGHT + 3, frame);
-        ctx.fill(left - 1, BAR_Y - 1, right + 1, BAR_Y + BAR_HEIGHT + 1, inner);
-        ctx.fill(left, BAR_Y, right, BAR_Y + BAR_HEIGHT, empty);
-
-        // Damage trail stays behind the live HP bar.
-        int trailWidth = Math.round(BAR_WIDTH * Math.max(0.0f, Math.min(1.0f, damageTrail)));
-        if (trailWidth > 0) {
-            drawBarFill(ctx, left, BAR_Y, trailWidth, trail);
-        }
-
-        int fillWidth = Math.round(BAR_WIDTH * hp);
-        if (fillWidth > 0) {
-            drawBarFill(ctx, left, BAR_Y, fillWidth, fill);
-            ctx.fill(left, BAR_Y, Math.max(left, left + fillWidth - 4), BAR_Y + 2, fillHighlight);
-        }
-
-        // A brief white hit line gives damage a distinct SAO-like feedback cue.
-        if (hitFlash > 0.02f) {
-            int flash = withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.34f);
-            ctx.fill(left, BAR_Y, right, BAR_Y + 1, flash);
-        }
-    }
-
     /**
      * Renders the SAO-style red target pin above the currently locked entity.
      * It is a camera-facing diamond so it remains readable while the player
@@ -252,6 +162,9 @@ public final class SaoTargetHpClient implements ClientModInitializer {
 
         VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
 
+        // The HP gauge is camera-facing and placed directly to the left of the pin.
+        drawTargetHealthBar(consumer, matrices, size);
+
         // Dark outer diamond.
         drawDiamond(consumer, matrices, size * 1.16f, 0xB0000000);
         // SAO-like red inner diamond.
@@ -260,6 +173,77 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         drawDiamond(consumer, matrices, size * 0.28f, withAlpha(0xFFFF8AA2, pinAlpha * 0.75f));
 
         matrices.pop();
+    }
+
+    /** Draws a slim, beveled HP gauge based on the supplied reference image. */
+    private static void drawTargetHealthBar(VertexConsumer consumer, MatrixStack matrices, float pinSize) {
+        float barWidth = pinSize * 8.4f;
+        float barHeight = pinSize * 0.92f;
+        float gap = pinSize * 0.46f;
+        float left = -pinSize - gap - barWidth;
+        float right = -pinSize - gap;
+        float top = barHeight * 0.50f;
+        float bottom = -top;
+        float bevel = barHeight * 0.48f;
+        float inset = Math.max(0.025f, pinSize * 0.12f);
+
+        // The three nested silhouettes create the dark outline, gray rim, and dark empty interior.
+        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel,
+                withAlpha(0xE8000000, alpha));
+        drawBeveledBar(consumer, matrices, left + inset, right - inset, top - inset, bottom + inset,
+                Math.max(0.0f, bevel - inset), withAlpha(0xFF2F332D, alpha));
+
+        float innerInset = inset * 1.65f;
+        float innerLeft = left + innerInset;
+        float innerRight = right - innerInset;
+        float innerTop = top - innerInset;
+        float innerBottom = bottom + innerInset;
+        float innerBevel = Math.max(0.0f, bevel - innerInset);
+        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel,
+                withAlpha(0xFF152018, alpha));
+
+        // Retain the delayed damage trail, while the live fill keeps the angled right edge from the reference.
+        float innerWidth = innerRight - innerLeft;
+        float trailRight = innerLeft + innerWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
+        if (trailRight > innerLeft) {
+            drawBeveledBar(consumer, matrices, innerLeft, trailRight, innerTop, innerBottom,
+                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)),
+                    withAlpha(0xFF8F6A2C, alpha * 0.72f));
+        }
+
+        float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
+        float fillRight = innerLeft + innerWidth * hp;
+        if (fillRight > innerLeft) {
+            drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, innerBottom,
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)),
+                    withAlpha(0xFF58A83B, alpha));
+
+            float highlightBottom = innerTop - Math.max(0.015f, pinSize * 0.08f);
+            drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, highlightBottom,
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)),
+                    withAlpha(0xFF83D25B, alpha * 0.72f));
+        }
+
+        if (hitFlash > 0.02f) {
+            drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop,
+                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel,
+                    withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
+        }
+    }
+
+    private static void drawBeveledBar(VertexConsumer consumer, MatrixStack matrices,
+                                       float left, float right, float top, float bottom, float bevel, int argb) {
+        if (right <= left || top <= bottom) return;
+        int a = (argb >>> 24) & 0xFF;
+        int r = (argb >>> 16) & 0xFF;
+        int g = (argb >>> 8) & 0xFF;
+        int b = argb & 0xFF;
+        MatrixStack.Entry entry = matrices.peek();
+
+        consumer.vertex(entry.getPositionMatrix(), left, top, 0.0f).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), right, top, 0.0f).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), right - bevel, bottom, 0.0f).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), left, bottom, 0.0f).color(r, g, b, a);
     }
 
     private static void drawDiamond(VertexConsumer consumer, MatrixStack matrices, float size, int argb) {
@@ -274,36 +258,6 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         consumer.vertex(entry.getPositionMatrix(), size * 0.62f, 0.0f, 0.0f).color(r, g, b, a);
         consumer.vertex(entry.getPositionMatrix(), 0.0f, -size, 0.0f).color(r, g, b, a);
         consumer.vertex(entry.getPositionMatrix(), -size * 0.62f, 0.0f, 0.0f).color(r, g, b, a);
-    }
-
-    private static void drawBarFill(DrawContext ctx, int x, int y, int width, int color) {
-        if (width <= 0) return;
-        // The reference UI has a clipped/trapezoid-like right edge. Approximate it
-        // with progressively shorter rows so the fill remains texture-free.
-        int h = BAR_HEIGHT;
-        int edge = Math.min(4, width / 2);
-        ctx.fill(x, y, x + Math.max(1, width - edge), y + h, color);
-        if (edge > 0) {
-            for (int row = 0; row < h; row++) {
-                int inset = Math.max(0, edge - 1 - Math.min(edge - 1, row / 2));
-                int rowRight = x + width - inset;
-                if (rowRight > x + width - edge) {
-                    ctx.fill(x + Math.max(0, width - edge), y + row, rowRight, y + row + 1, color);
-                }
-            }
-        }
-    }
-
-    private static void drawCorner(DrawContext ctx, int x, int y, boolean rightSide, int color) {
-        int dx = rightSide ? -1 : 1;
-        ctx.fill(x, y, x + dx * 2, y + 2, color);
-        ctx.fill(x, y, x + dx * 2, y + 10, color);
-        ctx.fill(x, y, x + dx * 10, y + 2, color);
-    }
-
-    private static float easeOutCubic(float t) {
-        float x = 1.0f - Math.max(0.0f, Math.min(1.0f, t));
-        return 1.0f - x * x * x;
     }
 
     private static int withAlpha(int argb, float opacity) {
