@@ -171,11 +171,11 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         matrices.translate(x, y, z);
         matrices.multiply(camera.getRotation());
         // Dark outer diamond.
-        drawDiamond(consumer, matrices, size * 1.16f, 0.000f, 0xB0000000);
+        drawDiamond(consumer, matrices, size * 1.16f, 0.010f, 0xB0000000);
         // SAO-like red inner diamond.
-        drawDiamond(consumer, matrices, size, -0.002f, withAlpha(0xFFE51B45, pinAlpha));
+        drawDiamond(consumer, matrices, size, 0.012f, withAlpha(0xFFE51B45, pinAlpha));
         // Small bright center gives the marker a glassy/highlighted feel.
-        drawDiamond(consumer, matrices, size * 0.28f, -0.004f, withAlpha(0xFFFF8AA2, pinAlpha * 0.75f));
+        drawDiamond(consumer, matrices, size * 0.28f, 0.014f, withAlpha(0xFFFF8AA2, pinAlpha * 0.75f));
 
         matrices.pop();
     }
@@ -193,10 +193,10 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float inset = Math.max(0.025f, pinSize * 0.12f);
 
         // The three nested silhouettes create the dark outline, gray rim, and dark empty interior.
-        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel, 0.000f,
+        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel, 0.010f,
                 withAlpha(0xE8000000, alpha));
         drawBeveledBar(consumer, matrices, left + inset, right - inset, top - inset, bottom + inset,
-                Math.max(0.0f, bevel - inset), -0.002f, withAlpha(0xFF2F332D, alpha));
+                Math.max(0.0f, bevel - inset), 0.012f, withAlpha(0xFF2F332D, alpha));
 
         float innerInset = inset * 1.65f;
         float innerLeft = left + innerInset;
@@ -204,7 +204,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float innerTop = top - innerInset;
         float innerBottom = bottom + innerInset;
         float innerBevel = Math.max(0.0f, bevel - innerInset);
-        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel, -0.004f,
+        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel, 0.014f,
                 withAlpha(0xFF152018, alpha));
 
         // Retain the delayed damage trail, while the live fill keeps the angled right edge from the reference.
@@ -212,7 +212,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float trailRight = innerLeft + innerWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
         if (trailRight > innerLeft) {
             drawBeveledBar(consumer, matrices, innerLeft, trailRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)), -0.006f,
+                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)), 0.016f,
                     withAlpha(0xFF8F6A2C, alpha * 0.72f));
         }
 
@@ -220,18 +220,18 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float fillRight = innerLeft + innerWidth * hp;
         if (fillRight > innerLeft) {
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), -0.008f,
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.018f,
                     withAlpha(0xFF58A83B, alpha));
 
             float highlightBottom = innerTop - Math.max(0.015f, pinSize * 0.08f);
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, highlightBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), -0.010f,
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.020f,
                     withAlpha(0xFF83D25B, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
             drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop,
-                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel, -0.012f,
+                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel, 0.022f,
                     withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
         }
     }
