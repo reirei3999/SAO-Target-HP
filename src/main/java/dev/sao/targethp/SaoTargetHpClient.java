@@ -28,7 +28,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     private static final float SLIDE_SPEED = 0.20f;
     private static final float HEALTH_FOLLOW = 0.24f;
     private static final float DAMAGE_TRAIL_FOLLOW = 0.045f;
-    private static final double HEALTH_BAR_VERTICAL_OFFSET = 2.0D;
+    private static final double HEALTH_BAR_VERTICAL_OFFSET = 1.5D;
 
     private static LivingEntity target;
     private static float alpha;
@@ -159,7 +159,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
 
         VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
 
-        // Offset the gauge two blocks downward in world space, then rotate it to face the player.
+        // Offset the gauge 1.5 blocks downward in world space, then rotate it to face the player.
         matrices.push();
         matrices.translate(x, y - HEALTH_BAR_VERTICAL_OFFSET, z);
         matrices.multiply(camera.getRotation());
