@@ -153,8 +153,8 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         double y = target.getBodyY(0.5D) + target.getHeight() + 0.55D - cameraPos.y;
         double z = target.getZ() - cameraPos.z;
         double distance = Math.sqrt(x * x + y * y + z * z);
-        float pulse = 1.0f + 0.08f * (float) Math.sin((System.nanoTime() / 1_000_000_000.0) * 4.0);
-        float size = (float) Math.max(0.22D, Math.min(0.70D, 0.28D + distance * 0.0032D)) * pulse;
+        // Keep the marker at a stable distance-based size; it must not pulse or breathe.
+        float size = (float) Math.max(0.22D, Math.min(0.70D, 0.28D + distance * 0.0032D));
         float pinAlpha = alpha * 0.92f;
 
         VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
@@ -171,11 +171,11 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         matrices.translate(x, y, z);
         matrices.multiply(camera.getRotation());
         // Dark outer diamond.
-        drawDiamond(consumer, matrices, size * 1.16f, 0xB0000000);
+        drawDiamond(consumer, matrices, size * 1.16f, 0.000f, 0xB0000000);
         // SAO-like red inner diamond.
-        drawDiamond(consumer, matrices, size, withAlpha(0xFFE51B45, pinAlpha));
+        drawDiamond(consumer, matrices, size, -0.002f, withAlpha(0xFFE51B45, pinAlpha));
         // Small bright center gives the marker a glassy/highlighted feel.
-        drawDiamond(consumer, matrices, size * 0.28f, withAlpha(0xFFFF8AA2, pinAlpha * 0.75f));
+        drawDiamond(consumer, matrices, size * 0.28f, -0.004f, withAlpha(0xFFFF8AA2, pinAlpha * 0.75f));
 
         matrices.pop();
     }
@@ -193,10 +193,10 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float inset = Math.max(0.025f, pinSize * 0.12f);
 
         // The three nested silhouettes create the dark outline, gray rim, and dark empty interior.
-        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel,
+        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel, 0.000f,
                 withAlpha(0xE8000000, alpha));
         drawBeveledBar(consumer, matrices, left + inset, right - inset, top - inset, bottom + inset,
-                Math.max(0.0f, bevel - inset), withAlpha(0xFF2F332D, alpha));
+                Math.max(0.0f, bevel - inset), -0.002f, withAlpha(0xFF2F332D, alpha));
 
         float innerInset = inset * 1.65f;
         float innerLeft = left + innerInset;
@@ -204,7 +204,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float innerTop = top - innerInset;
         float innerBottom = bottom + innerInset;
         float innerBevel = Math.max(0.0f, bevel - innerInset);
-        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel,
+        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel, -0.004f,
                 withAlpha(0xFF152018, alpha));
 
         // Retain the delayed damage trail, while the live fill keeps the angled right edge from the reference.
@@ -212,7 +212,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float trailRight = innerLeft + innerWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
         if (trailRight > innerLeft) {
             drawBeveledBar(consumer, matrices, innerLeft, trailRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)),
+                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)), -0.006f,
                     withAlpha(0xFF8F6A2C, alpha * 0.72f));
         }
 
@@ -220,24 +220,25 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float fillRight = innerLeft + innerWidth * hp;
         if (fillRight > innerLeft) {
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)),
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), -0.008f,
                     withAlpha(0xFF58A83B, alpha));
 
             float highlightBottom = innerTop - Math.max(0.015f, pinSize * 0.08f);
             drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, highlightBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)),
+                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), -0.010f,
                     withAlpha(0xFF83D25B, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
             drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop,
-                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel,
+                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel, -0.012f,
                     withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
         }
     }
 
     private static void drawBeveledBar(VertexConsumer consumer, MatrixStack matrices,
-                                       float left, float right, float top, float bottom, float bevel, int argb) {
+                                       float left, float right, float top, float bottom, float bevel,
+                                       float depth, int argb) {
         if (right <= left || top <= bottom) return;
         int a = (argb >>> 24) & 0xFF;
         int r = (argb >>> 16) & 0xFF;
@@ -245,13 +246,13 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         int b = argb & 0xFF;
         MatrixStack.Entry entry = matrices.peek();
 
-        consumer.vertex(entry.getPositionMatrix(), left, top, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), right, top, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), right - bevel, bottom, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), left, bottom, 0.0f).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), left, top, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), right, top, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), right - bevel, bottom, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), left, bottom, depth).color(r, g, b, a);
     }
 
-    private static void drawDiamond(VertexConsumer consumer, MatrixStack matrices, float size, int argb) {
+    private static void drawDiamond(VertexConsumer consumer, MatrixStack matrices, float size, float depth, int argb) {
         int a = (argb >>> 24) & 0xFF;
         int r = (argb >>> 16) & 0xFF;
         int g = (argb >>> 8) & 0xFF;
@@ -259,10 +260,10 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         MatrixStack.Entry entry = matrices.peek();
 
         // Four vertices form a camera-facing diamond.
-        consumer.vertex(entry.getPositionMatrix(), 0.0f, size, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), size * 0.62f, 0.0f, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), 0.0f, -size, 0.0f).color(r, g, b, a);
-        consumer.vertex(entry.getPositionMatrix(), -size * 0.62f, 0.0f, 0.0f).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), 0.0f, size, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), size * 0.62f, 0.0f, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), 0.0f, -size, depth).color(r, g, b, a);
+        consumer.vertex(entry.getPositionMatrix(), -size * 0.62f, 0.0f, depth).color(r, g, b, a);
     }
 
     private static int withAlpha(int argb, float opacity) {
