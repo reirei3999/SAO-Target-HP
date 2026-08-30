@@ -3,11 +3,12 @@ name: Build MOD
 on:
   push:
     branches: [ "main", "master" ]
+    tags: [ "*" ]
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -34,3 +35,14 @@ jobs:
           name: sao-target-hp-build
           path: build/libs/*.jar
           if-no-files-found: error
+
+      - name: GitHub Releasesへ完成版を添付
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            Minecraft 1.21.1 / Fabric 用のリリースです。
+
+            導入するファイルは `sao-target-hp-${{ github.ref_name }}.jar` です。`-dev.jar` は導入しないでください。
+          files: build/libs/sao-target-hp-${{ github.ref_name }}.jar
