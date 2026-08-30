@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "dev.sao.targethp.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "accessor.BossBarHudAccessor",
+    "BossBarHudMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
