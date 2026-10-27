@@ -40,15 +40,18 @@ jobs:
 
       - name: リリース用JARを選別
         if: startsWith(github.ref, 'refs/tags/')
-        run: rm -f build/libs/*-dev.jar build/libs/*-sources.jar
+        run: |
+          rm -f build/libs/*-dev.jar build/libs/*-sources.jar
+          JAR=$(basename "$(ls build/libs/sao-target-hp-*.jar | head -n1)")
+          echo "RELEASE_JAR=${JAR}" >> "$GITHUB_ENV"
 
       - name: GitHub Releasesへ完成版を添付
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           body: |
             Minecraft 1.21.1 / Fabric 用のリリースです。
 
-            導入するファイルは `sao-target-hp-${{ github.ref_name }}.jar` です。`-dev.jar` は導入しないでください。
+            導入するファイルは `${{ env.RELEASE_JAR }}` です。`-dev.jar` は導入しないでください。
           files: build/libs/sao-target-hp-*.jar
