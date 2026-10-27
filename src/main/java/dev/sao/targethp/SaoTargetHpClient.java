@@ -180,43 +180,38 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         matrices.pop();
     }
 
-    /** Draws a slim, beveled HP gauge based on the supplied reference image. */
+    /**
+     * Draws the slim, long HP gauge from the supplied reference image: a thin dark
+     * outline, a flat green body, and a shallow diagonal cut at the right tip.
+     */
     private static void drawTargetHealthBar(VertexConsumer consumer, MatrixStack matrices, float pinSize) {
-        float barWidth = pinSize * 8.4f;
-        float barHeight = pinSize * 0.92f;
+        float barWidth = pinSize * 9.6f;
+        float barHeight = pinSize * 0.68f;
         float gap = pinSize * 0.46f;
-        float left = -pinSize - gap - barWidth;
         float right = -pinSize - gap;
+        float left = right - barWidth;
         float top = barHeight * 0.50f;
         float bottom = -top;
-        float bevel = barHeight * 0.48f;
-        float inset = Math.max(0.025f, pinSize * 0.12f);
+        float taper = barHeight * 1.60f;
+        float rim = Math.max(0.02f, pinSize * 0.07f);
 
-        // The three nested silhouettes create the dark outline, gray rim, and dark empty interior.
-        drawBeveledBar(consumer, matrices, left, right, top, bottom, bevel, 0.010f,
-                withAlpha(0xE8000000, alpha));
-        drawBeveledBar(consumer, matrices, left + inset, right - inset, top - inset, bottom + inset,
-                Math.max(0.0f, bevel - inset), 0.012f, withAlpha(0xFF2F332D, alpha));
+        // Dark frame first, then the recessed interior, so the outline stays thin and even.
+        drawBeveledBar(consumer, matrices, left - rim, right + rim, top + rim, bottom - rim,
+                taper + rim, 0.010f, withAlpha(0xE8000000, alpha));
+        drawBeveledBar(consumer, matrices, left, right, top, bottom, taper, 0.012f,
+                withAlpha(0xFF162016, alpha));
 
-        float innerInset = inset * 1.65f;
-        float innerLeft = left + innerInset;
-        float innerRight = right - innerInset;
-        float innerTop = top - innerInset;
-        float innerBottom = bottom + innerInset;
-        float innerBevel = Math.max(0.0f, bevel - innerInset);
-        drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop, innerBottom, innerBevel, 0.014f,
-                withAlpha(0xFF152018, alpha));
+        float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
+        float trailRight = left + barWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
+        float liveRight = left + barWidth * hp;
 
-        // Retain the delayed damage trail, while the live fill keeps the angled right edge from the reference.
-        float innerWidth = innerRight - innerLeft;
-        float trailRight = innerLeft + innerWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
-        if (trailRight > innerLeft) {
-            drawBeveledBar(consumer, matrices, innerLeft, trailRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (trailRight - innerLeft) * 0.45f)), 0.016f,
+        // Retained damage trail, kept just behind the live fill.
+        if (trailRight > left + 0.001f) {
+            drawBeveledBar(consumer, matrices, left, trailRight, top, bottom,
+                    Math.min(taper, (trailRight - left) * 0.85f), 0.014f,
                     withAlpha(0xFF8F6A2C, alpha * 0.72f));
         }
 
-        float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
         // Use the target's current HP for the warning colour, while retaining the smooth fill animation.
         float currentHp = target == null ? hp : healthRatio(target);
         int fillColor = 0xFF58A83B;
@@ -228,22 +223,22 @@ public final class SaoTargetHpClient implements ClientModInitializer {
             fillColor = 0xFFE0AF32;
             highlightColor = 0xFFFFDD69;
         }
-        float fillRight = innerLeft + innerWidth * hp;
-        if (fillRight > innerLeft) {
-            drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, innerBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.018f,
+
+        if (liveRight > left + 0.001f) {
+            float liveTaper = Math.min(taper, (liveRight - left) * 0.85f);
+            drawBeveledBar(consumer, matrices, left, liveRight, top, bottom, liveTaper, 0.016f,
                     withAlpha(fillColor, alpha));
 
-            float highlightBottom = innerTop - Math.max(0.015f, pinSize * 0.08f);
-            drawBeveledBar(consumer, matrices, innerLeft, fillRight, innerTop, highlightBottom,
-                    Math.min(innerBevel, Math.max(0.0f, (fillRight - innerLeft) * 0.45f)), 0.020f,
+            // Flat top sheen, matching the highlight band in the reference.
+            float sheenBottom = top - barHeight * 0.34f;
+            drawBeveledBar(consumer, matrices, left, liveRight, top, sheenBottom,
+                    Math.min(liveTaper, (liveRight - left) * 0.85f), 0.018f,
                     withAlpha(highlightColor, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
-            drawBeveledBar(consumer, matrices, innerLeft, innerRight, innerTop,
-                    innerTop - Math.max(0.012f, pinSize * 0.055f), innerBevel, 0.022f,
-                    withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
+            drawBeveledBar(consumer, matrices, left, right, top, top - barHeight * 0.30f,
+                    taper, 0.020f, withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
         }
     }
 

@@ -17,8 +17,10 @@ import java.util.UUID;
 /** Replaces the vanilla boss bar renderer with an original SAO-inspired presentation. */
 @Mixin(BossBarHud.class)
 public abstract class BossBarHudMixin {
-    private static final int BAR_WIDTH = 380;
-    private static final int BAR_HEIGHT = 18;
+    private static final int BAR_WIDTH = 430;
+    private static final int BAR_HEIGHT = 12;
+    private static final int BAR_SPACING = 28;
+    private static final int FIRST_BAR_Y = 24;
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void saotargethp$render(DrawContext context, CallbackInfo ci) {
@@ -28,7 +30,7 @@ public abstract class BossBarHudMixin {
 
         int screenWidth = client.getWindow().getScaledWidth();
         int centerX = screenWidth / 2;
-        int y = 25;
+        int y = FIRST_BAR_Y;
 
         for (ClientBossBar bar : bars.values()) {
             String name = bar.getName().getString();
@@ -36,21 +38,20 @@ public abstract class BossBarHudMixin {
             int nameX = centerX - nameWidth / 2;
             int left = centerX - BAR_WIDTH / 2;
             int white = 0xFFF4F4F4;
+            float percent = Math.max(0.0f, Math.min(1.0f, bar.getPercent()));
 
-            context.drawText(client.textRenderer, Text.literal(name), nameX, y - 12, white, true);
+            context.drawText(client.textRenderer, Text.literal(name), nameX, y - 11, white, true);
 
-            // The silhouette matches the reference: a long upper gauge with a stepped,
-            // diagonal lower edge halfway across and a beveled right tip.
-            drawReferenceBar(context, left - 3, y - 3, BAR_WIDTH + 6, BAR_HEIGHT + 6, 1.0f, 0xFF141414);
+            // Matches the reference: a long, slim gauge with a thin dark rim and a
+            // shallow diagonal cut at the far-right tip.
+            drawReferenceBar(context, left - 2, y - 2, BAR_WIDTH + 4, BAR_HEIGHT + 4, 1.0f, 0xFF0E0E0E);
             drawReferenceBar(context, left - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, 1.0f, 0xFF2D312A);
-            drawReferenceBar(context, left + 2, y + 2, BAR_WIDTH - 4, BAR_HEIGHT - 4, 1.0f, 0xFF162016);
-            drawReferenceBar(context, left + 2, y + 2, BAR_WIDTH - 4, BAR_HEIGHT - 4,
-                    Math.max(0.0f, Math.min(1.0f, bar.getPercent())), 0xFF55A83A);
+            drawReferenceBar(context, left, y, BAR_WIDTH, BAR_HEIGHT, 1.0f, 0xFF162016);
+            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, BAR_HEIGHT - 2, percent, 0xFF55A83A);
 
             // A narrow top sheen makes the green fill read like the supplied image.
-            drawReferenceBar(context, left + 3, y + 3, BAR_WIDTH - 6, 3,
-                    Math.max(0.0f, Math.min(1.0f, bar.getPercent())), 0xFF79C95A);
-            y += 40;
+            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, 2, percent, 0xFF79C95A);
+            y += BAR_SPACING;
         }
 
         ci.cancel();
@@ -62,23 +63,18 @@ public abstract class BossBarHudMixin {
         if (width <= 0 || height <= 0 || percent <= 0.0f) return;
 
         int right = left + width;
-        int hingeX = left + width / 2;
-        int upperHeight = Math.max(2, Math.round(height * 0.62f));
-        int bevel = Math.max(2, Math.round(height * 0.45f));
-        int fillRight = left + Math.round(width * Math.min(1.0f, percent));
+        int bevel = Math.max(2, Math.round(height * 1.35f));
+        int fillWidth = Math.round(width * Math.min(1.0f, percent));
+        int fillRight = left + fillWidth;
+        // The fill keeps the same angled tip as the frame so the green edge never looks square.
+        float fillBevel = Math.min(bevel, fillWidth * 0.85f);
 
         for (int row = 0; row < height; row++) {
-            int silhouetteRight;
-            if (row < upperHeight) {
-                // The far-right end slopes inward as it reaches the gauge's lower edge.
-                silhouetteRight = right - Math.round(bevel * (row / (float) upperHeight));
-            } else {
-                // The lower edge steps inward at the center and slopes down to the left half.
-                float progress = (row - upperHeight) / (float) Math.max(1, height - upperHeight);
-                silhouetteRight = hingeX + bevel - Math.round(bevel * progress);
-            }
+            float progress = height == 1 ? 0.0f : row / (float) (height - 1);
+            int silhouetteRight = right - Math.round(bevel * progress);
+            int fillRowRight = fillRight - Math.round(fillBevel * progress);
 
-            int rowRight = Math.min(silhouetteRight, fillRight);
+            int rowRight = Math.min(silhouetteRight, fillRowRight);
             if (rowRight > left) {
                 context.fill(left, top + row, rowRight, top + row + 1, color);
             }
