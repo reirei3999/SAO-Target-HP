@@ -1,5 +1,6 @@
 package dev.sao.targethp.mixin;
 
+import dev.sao.targethp.config.SaoConfig;
 import dev.sao.targethp.mixin.accessor.BossBarHudAccessor;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -19,8 +20,6 @@ import java.util.UUID;
 public abstract class BossBarHudMixin {
     private static final int BAR_WIDTH = 430;
     private static final int BAR_HEIGHT = 12;
-    private static final int BAR_SPACING = 28;
-    private static final int FIRST_BAR_Y = 24;
 
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void saotargethp$render(DrawContext context, CallbackInfo ci) {
@@ -28,30 +27,31 @@ public abstract class BossBarHudMixin {
         Map<UUID, ClientBossBar> bars = ((BossBarHudAccessor) this).saotargethp$getBossBars();
         if (bars.isEmpty() || client.player == null) return;
 
+        SaoConfig.BossBar settings = SaoConfig.get().boss;
         int screenWidth = client.getWindow().getScaledWidth();
-        int centerX = screenWidth / 2;
-        int y = FIRST_BAR_Y;
+        int centerX = screenWidth / 2 + settings.offsetX;
+        int y = settings.offsetY;
 
         for (ClientBossBar bar : bars.values()) {
             String name = bar.getName().getString();
             int nameWidth = client.textRenderer.getWidth(name);
             int nameX = centerX - nameWidth / 2;
             int left = centerX - BAR_WIDTH / 2;
-            int white = 0xFFF4F4F4;
             float percent = Math.max(0.0f, Math.min(1.0f, bar.getPercent()));
 
-            context.drawText(client.textRenderer, Text.literal(name), nameX, y - 11, white, true);
+            context.drawText(client.textRenderer, Text.literal(name), nameX, y + settings.nameOffsetY,
+                    settings.nameArgb, true);
 
             // Matches the reference: a long, slim gauge with a thin dark rim and a
             // shallow diagonal cut at the far-right tip.
-            drawReferenceBar(context, left - 2, y - 2, BAR_WIDTH + 4, BAR_HEIGHT + 4, 1.0f, 0xFF0E0E0E);
-            drawReferenceBar(context, left - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, 1.0f, 0xFF2D312A);
-            drawReferenceBar(context, left, y, BAR_WIDTH, BAR_HEIGHT, 1.0f, 0xFF162016);
-            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, BAR_HEIGHT - 2, percent, 0xFF55A83A);
+            drawReferenceBar(context, left - 2, y - 2, BAR_WIDTH + 4, BAR_HEIGHT + 4, 1.0f, settings.outlineArgb);
+            drawReferenceBar(context, left - 1, y - 1, BAR_WIDTH + 2, BAR_HEIGHT + 2, 1.0f, settings.rimArgb);
+            drawReferenceBar(context, left, y, BAR_WIDTH, BAR_HEIGHT, 1.0f, settings.backgroundArgb);
+            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, BAR_HEIGHT - 2, percent, settings.fillArgb);
 
             // A narrow top sheen makes the green fill read like the supplied image.
-            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, 2, percent, 0xFF79C95A);
-            y += BAR_SPACING;
+            drawReferenceBar(context, left + 1, y + 1, BAR_WIDTH - 2, 2, percent, settings.highlightArgb);
+            y += settings.spacing;
         }
 
         ci.cancel();
