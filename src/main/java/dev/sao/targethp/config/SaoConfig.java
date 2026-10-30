@@ -56,15 +56,13 @@ public final class SaoConfig {
         if (cfg.boss == null) {
             cfg.boss = new BossBar();
         }
-        cfg.sanitize();
-        cfg.resolveColors();
+        cfg.normalize();
         cfg.save();
         return cfg;
     }
 
     public void save() {
-        sanitize();
-        resolveColors();
+        normalize();
         try {
             Files.createDirectories(PATH.getParent());
             try (BufferedWriter writer = Files.newBufferedWriter(PATH, StandardCharsets.UTF_8)) {
@@ -81,12 +79,10 @@ public final class SaoConfig {
         save();
     }
 
-    private void sanitize() {
+    /** Clamps every value into its supported range and refreshes the cached colours. */
+    public void normalize() {
         mob.sanitize();
         boss.sanitize();
-    }
-
-    private void resolveColors() {
         mob.resolveColors();
         boss.resolveColors();
     }
@@ -217,8 +213,8 @@ public final class SaoConfig {
         public transient int nameArgb;
 
         private void sanitize() {
-            offsetX = (int) clamp(offsetX, -2000.0D, 2000.0D);
-            offsetY = (int) clamp(offsetY, -200.0D, 2000.0D);
+            offsetX = (int) clamp(offsetX, -600.0D, 600.0D);
+            offsetY = (int) clamp(offsetY, -100.0D, 600.0D);
             spacing = (int) clamp(spacing, 0.0D, 200.0D);
             nameOffsetY = (int) clamp(nameOffsetY, -100.0D, 100.0D);
         }
