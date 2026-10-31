@@ -1,6 +1,7 @@
 package dev.sao.targethp.gui;
 
 import dev.sao.targethp.config.SaoConfig;
+import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -17,6 +18,7 @@ public final class ColorConfigScreen extends Screen {
     private static final int ROW_HEIGHT = 20;
     private static final int FIELD_WIDTH = 110;
     private static final int COLUMN_WIDTH = 200;
+    private static final int FIELD_X_OFFSET = 92;
 
     private final TargetHpConfigScreen parent;
     private final SaoConfig config = SaoConfig.get();
@@ -34,17 +36,17 @@ public final class ColorConfigScreen extends Screen {
         this.rows.clear();
 
         List<Entry> entries = List.of(
-                new Entry("通常", () -> config.mob.normalColor, v -> config.mob.normalColor = v),
-                new Entry("通常ハイライト", () -> config.mob.normalHighlightColor, v -> config.mob.normalHighlightColor = v),
-                new Entry("警戒", () -> config.mob.cautionColor, v -> config.mob.cautionColor = v),
-                new Entry("警戒ハイライト", () -> config.mob.cautionHighlightColor, v -> config.mob.cautionHighlightColor = v),
-                new Entry("危険", () -> config.mob.dangerColor, v -> config.mob.dangerColor = v),
-                new Entry("危険ハイライト", () -> config.mob.dangerHighlightColor, v -> config.mob.dangerHighlightColor = v),
-                new Entry("残像", () -> config.mob.trailColor, v -> config.mob.trailColor = v),
-                new Entry("背景", () -> config.mob.backgroundColor, v -> config.mob.backgroundColor = v),
-                new Entry("外枠", () -> config.mob.outlineColor, v -> config.mob.outlineColor = v),
-                new Entry("ボス塗り", () -> config.boss.fillColor, v -> config.boss.fillColor = v),
-                new Entry("ボス強調", () -> config.boss.highlightColor, v -> config.boss.highlightColor = v),
+                new Entry("グリーンゲージ", () -> config.mob.normalColor, v -> config.mob.normalColor = v),
+                new Entry("グリーンハイライト", () -> config.mob.normalHighlightColor, v -> config.mob.normalHighlightColor = v),
+                new Entry("イエローゲージ", () -> config.mob.cautionColor, v -> config.mob.cautionColor = v),
+                new Entry("イエローハイライト", () -> config.mob.cautionHighlightColor, v -> config.mob.cautionHighlightColor = v),
+                new Entry("レッドゲージ", () -> config.mob.dangerColor, v -> config.mob.dangerColor = v),
+                new Entry("レッドハイライト", () -> config.mob.dangerHighlightColor, v -> config.mob.dangerHighlightColor = v),
+                new Entry("ダメージ残像", () -> config.mob.trailColor, v -> config.mob.trailColor = v),
+                new Entry("ゲージ背景", () -> config.mob.backgroundColor, v -> config.mob.backgroundColor = v),
+                new Entry("ゲージ外枠", () -> config.mob.outlineColor, v -> config.mob.outlineColor = v),
+                new Entry("ボスゲージ", () -> config.boss.fillColor, v -> config.boss.fillColor = v),
+                new Entry("ボスハイライト", () -> config.boss.highlightColor, v -> config.boss.highlightColor = v),
                 new Entry("ボス背景", () -> config.boss.backgroundColor, v -> config.boss.backgroundColor = v),
                 new Entry("ボスリム", () -> config.boss.rimColor, v -> config.boss.rimColor = v),
                 new Entry("ボス外枠", () -> config.boss.outlineColor, v -> config.boss.outlineColor = v),
@@ -53,8 +55,8 @@ public final class ColorConfigScreen extends Screen {
         int centerX = this.width / 2;
         int leftColumnX = centerX - COLUMN_WIDTH - 2;
         int rightColumnX = centerX + 2;
-        int top = Math.max(46, this.height / 2 - 88);
-        this.titleY = top - 32;
+        int top = Math.max(48, this.height / 2 - 88);
+        this.titleY = top - 34;
 
         int perColumn = 8;
         for (int i = 0; i < entries.size(); i++) {
@@ -64,10 +66,13 @@ public final class ColorConfigScreen extends Screen {
             int x = column == 0 ? leftColumnX : rightColumnX;
             int y = top + row * ROW_HEIGHT;
 
-            TextFieldWidget field = new TextFieldWidget(this.textRenderer,
-                    x + 86, y, FIELD_WIDTH, 18, Text.literal(entry.label));
+            ColorField field = new ColorField(this.textRenderer,
+                    x + FIELD_X_OFFSET, y, FIELD_WIDTH, 18, Text.literal(entry.label));
             field.setMaxLength(9);
             field.setText(entry.getter.get());
+            field.setTint(tintOf(entry.getter.get()));
+            // Keep the text colour in sync while the user types the hex value.
+            field.setChangedListener(text -> field.setTint(tintOf(text)));
             addDrawableChild(field);
             this.rows.add(new Row(field, entry.label, x, y, entry.getter, entry.setter));
         }
@@ -103,6 +108,14 @@ public final class ColorConfigScreen extends Screen {
         config.save();
     }
 
+    /** Resolves a hex string to the colour used for the field text; invalid input stays neutral. */
+    private static int tintOf(String raw) {
+        if (!SaoConfig.isValidColor(raw)) {
+            return 0xFFFFFFFF;
+        }
+        return SaoConfig.parseColor(raw, 0xFFFFFFFF);
+    }
+
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         super.render(context, mouseX, mouseY, delta);
@@ -110,8 +123,11 @@ public final class ColorConfigScreen extends Screen {
         int centerX = this.width / 2;
         context.drawCenteredTextWithShadow(this.textRenderer, this.title, centerX, this.titleY, 0xFFFFFF);
         context.drawCenteredTextWithShadow(this.textRenderer,
-                Text.literal("形式: #RRGGBB または #AARRGGBB（先頭2桁が透明度）"),
+                Text.literal("入力欄の文字色が現在の色です"),
                 centerX, this.titleY + 12, 0xFF909090);
+        context.drawCenteredTextWithShadow(this.textRenderer,
+                Text.literal("形式: #RRGGBB / #AARRGGBB（先頭2桁が透明度）"),
+                centerX, this.titleY + 23, 0xFF909090);
         for (Row row : this.rows) {
             context.drawTextWithShadow(this.textRenderer, Text.literal(row.label), row.x, row.y + 5, 0xFFD0D0D0);
         }
@@ -129,14 +145,14 @@ public final class ColorConfigScreen extends Screen {
     }
 
     private static final class Row {
-        private final TextFieldWidget field;
+        private final ColorField field;
         private final String label;
         private final int x;
         private final int y;
         private final Supplier<String> getter;
         private final Consumer<String> setter;
 
-        private Row(TextFieldWidget field, String label, int x, int y,
+        private Row(ColorField field, String label, int x, int y,
                     Supplier<String> getter, Consumer<String> setter) {
             this.field = field;
             this.label = label;
@@ -144,6 +160,42 @@ public final class ColorConfigScreen extends Screen {
             this.y = y;
             this.getter = getter;
             this.setter = setter;
+        }
+    }
+
+    /**
+     * Text field that renders its own text in the configured colour. Very dark values
+     * would vanish on the vanilla black field, so the backdrop flips to light for them.
+     */
+    private static final class ColorField extends TextFieldWidget {
+        private int tint = 0xFFFFFFFF;
+
+        private ColorField(TextRenderer textRenderer, int x, int y, int width, int height, Text message) {
+            super(textRenderer, x, y, width, height, message);
+            setDrawsBackground(false);
+        }
+
+        private void setTint(int argb) {
+            this.tint = argb;
+            int opaque = argb | 0xFF000000;
+            setEditableColor(opaque);
+            setUneditableColor(opaque);
+        }
+
+        @Override
+        public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+            int red = (this.tint >> 16) & 0xFF;
+            int green = (this.tint >> 8) & 0xFF;
+            int blue = this.tint & 0xFF;
+            int luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+
+            int background = luminance < 96 ? 0xFFC6C6C6 : 0xFF0A0A0A;
+            int border = isFocused() ? 0xFFFFFFFF : 0xFF808080;
+
+            context.fill(getX() - 1, getY() - 1, getX() + getWidth() + 1, getY() + getHeight() + 1, border);
+            context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), background);
+
+            super.renderWidget(context, mouseX, mouseY, delta);
         }
     }
 }

@@ -40,9 +40,9 @@ public final class TargetHpConfigScreen extends Screen {
         this.mobHeaderY = top;
         int rowY = top + 12;
 
-        addDrawableChild(new ValueSlider(leftX, rowY, widgetWidth, WIDGET_HEIGHT, "黄になるHP", 0, 100, 1, true,
+        addDrawableChild(new ValueSlider(leftX, rowY, widgetWidth, WIDGET_HEIGHT, "イエローになるHP", 0, 100, 1, true,
                 () -> config.mob.cautionThresholdPercent, v -> config.mob.cautionThresholdPercent = v));
-        addDrawableChild(new ValueSlider(rightX, rowY, widgetWidth, WIDGET_HEIGHT, "赤になるHP", 0, 100, 1, true,
+        addDrawableChild(new ValueSlider(rightX, rowY, widgetWidth, WIDGET_HEIGHT, "レッドになるHP", 0, 100, 1, true,
                 () -> config.mob.dangerThresholdPercent, v -> config.mob.dangerThresholdPercent = v));
 
         rowY += ROW_HEIGHT;

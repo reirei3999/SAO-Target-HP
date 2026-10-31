@@ -25,7 +25,7 @@ Minecraftに、SAO風のターゲットHP表示を追加するクライアント
 
 | 項目 | 内容 |
 |---|---|
-| `mob.normalColor` / `cautionColor` / `dangerColor` | モブゲージの塗り色（通常・警戒・危険） |
+| `mob.normalColor` / `cautionColor` / `dangerColor` | モブゲージの塗り色（グリーン・イエロー・レッド） |
 | `mob.normalHighlightColor` など | 各状態の上面ハイライト色 |
 | `mob.trailColor` / `backgroundColor` / `outlineColor` | ダメージ残像・背景・外枠の色 |
 | `mob.cautionThresholdPercent` | 黄色に変わるHP割合（既定 40） |
