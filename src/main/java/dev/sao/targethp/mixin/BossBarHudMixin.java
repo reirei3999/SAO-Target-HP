@@ -1,5 +1,6 @@
 package dev.sao.targethp.mixin;
 
+import dev.sao.targethp.SaoTargetHpClient;
 import dev.sao.targethp.config.SaoConfig;
 import dev.sao.targethp.mixin.accessor.BossBarHudAccessor;
 import dev.sao.targethp.render.BarShapes;
@@ -26,6 +27,14 @@ public abstract class BossBarHudMixin {
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void saotargethp$render(DrawContext context, CallbackInfo ci) {
         MinecraftClient client = MinecraftClient.getInstance();
+        // The custom renderer replaces vanilla boss bars entirely, so switching the boss
+        // bar off (or hiding it with F1) must cancel the vanilla render rather than fall
+        // through and draw the default purple bars.
+        if (!SaoTargetHpClient.isBossBarAllowed(client)) {
+            ci.cancel();
+            return;
+        }
+
         Map<UUID, ClientBossBar> bars = ((BossBarHudAccessor) this).saotargethp$getBossBars();
         if (bars.isEmpty() || client.player == null) return;
 

@@ -22,12 +22,17 @@ import net.minecraft.world.RaycastContext;
 import net.minecraft.entity.boss.dragon.EnderDragonEntity;
 import net.minecraft.entity.boss.WitherEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.hit.HitResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Client-only SAO-inspired target HUD. All visuals are procedurally drawn.
  */
 public final class SaoTargetHpClient implements ClientModInitializer {
+    private static final Logger LOGGER = LoggerFactory.getLogger("saotargethp");
+
     private static final double TARGET_RANGE = 128.0D;
     private static final float FADE_SPEED = 0.16f;
     private static final float SLIDE_SPEED = 0.20f;
@@ -35,7 +40,21 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     private static final float DAMAGE_TRAIL_FOLLOW = 0.045f;
     private static final double HEALTH_BAR_VERTICAL_OFFSET = 1.5D;
 
+    /**
+     * The 128-block entity sweep is the only expensive work this mod does. Running it
+     * every other tick keeps the target one tick fresh while halving that cost, which
+     * matters on servers and in entity-dense areas.
+     */
+    private static final int SEARCH_INTERVAL_TICKS = 2;
+    /** Warn (rate limited) when one search blocks the client thread for too long. */
+    private static final long SLOW_SEARCH_WARN_NS = 20_000_000L;
+    private static final long SLOW_SEARCH_WARN_INTERVAL_NS = 10_000_000_000L;
+
     private static LivingEntity target;
+    private static ClientWorld targetWorld;
+    private static int searchCooldown;
+    private static long lastSlowSearchLog;
+    private static boolean failureLogged;
     private static float alpha;
     private static float slide;
     private static float displayedHealth;
@@ -57,12 +76,109 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     }
 
     private static void tick(MinecraftClient client) {
+        try {
+            handleKeybind(client);
+
+            // When the HUD is switched off (or hidden with F1), do nothing at all:
+            // no raycast, no entity scan and no rendering work.
+            if (!isHudAllowed(client)) {
+                resetTarget();
+                return;
+            }
+
+            // While a GUI is open the crosshair cannot aim, so the search is pure waste.
+            if (client.currentScreen != null) {
+                return;
+            }
+
+            if (client.world != targetWorld) {
+                // Changing dimension/leaving the world invalidates the cached entity.
+                targetWorld = client.world;
+                resetTarget();
+            }
+
+            updateTarget(searchTarget(client));
+        } catch (RuntimeException e) {
+            // Never let a HUD fault escape into the client tick loop; a broken render
+            // state should not take the whole game down.
+            if (!failureLogged) {
+                failureLogged = true;
+                LOGGER.error("SAO Target HP tick failed; the HUD keeps running defensively", e);
+            }
+            resetTarget();
+        }
+    }
+
+    private static void handleKeybind(MinecraftClient client) {
         while (settingsKey != null && settingsKey.wasPressed()) {
             client.setScreen(new TargetHpConfigScreen(client.currentScreen));
         }
+    }
 
-        LivingEntity next = findTarget(client);
+    /** Cached target lookup, refreshed every {@link #SEARCH_INTERVAL_TICKS} ticks. */
+    private static LivingEntity searchTarget(MinecraftClient client) {
+        LivingEntity current = target;
+        if (searchCooldown > 0) {
+            searchCooldown--;
+        } else {
+            searchCooldown = SEARCH_INTERVAL_TICKS - 1;
+            long start = System.nanoTime();
+            current = findTarget(client);
+            reportSlowSearch(System.nanoTime() - start);
+        }
 
+        // A cached target can die between two searches; drop it immediately so the
+        // gauge fades out instead of pointing at a corpse for another tick.
+        if (current != null && (current.isRemoved() || current.getHealth() <= 0.0F
+                || current.getEntityWorld() != client.world)) {
+            current = null;
+        }
+        return current;
+    }
+
+    private static void reportSlowSearch(long elapsed) {
+        if (elapsed < SLOW_SEARCH_WARN_NS) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - lastSlowSearchLog < SLOW_SEARCH_WARN_INTERVAL_NS) {
+            return;
+        }
+        lastSlowSearchLog = now;
+        LOGGER.warn("SAO Target HP: target search took {} ms. If this repeats, the HUD is"
+                        + " competing with the game for the client thread.",
+                String.format(java.util.Locale.ROOT, "%.1f", elapsed / 1_000_000.0D));
+    }
+
+    /** True when this mod is allowed to draw and search right now. */
+    public static boolean isHudAllowed(MinecraftClient client) {
+        SaoConfig.Display display = SaoConfig.get().display;
+        if (!display.enabled || !display.mobBar) {
+            return false;
+        }
+        return display.showWhenHudHidden || !client.options.hudHidden;
+    }
+
+    /** True when the boss bars may be drawn. */
+    public static boolean isBossBarAllowed(MinecraftClient client) {
+        SaoConfig.Display display = SaoConfig.get().display;
+        if (!display.enabled || !display.bossBar) {
+            return false;
+        }
+        return display.showWhenHudHidden || !client.options.hudHidden;
+    }
+
+    private static void resetTarget() {
+        target = null;
+        alpha = 0.0f;
+        slide = 0.0f;
+        displayedHealth = 0.0f;
+        damageTrail = 0.0f;
+        hitFlash = 0.0f;
+        acquirePulse = 0.0f;
+    }
+
+    private static void updateTarget(LivingEntity next) {
         if (next != null) {
             if (target != next) {
                 target = next;
@@ -157,6 +273,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
      * turns around the target.
      */
     private static void renderTargetPin(net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext context) {
+        if (!isHudAllowed(MinecraftClient.getInstance())) return;
         if (target == null || alpha <= 0.001f || target.isRemoved()) return;
 
         MatrixStack matrices = context.matrixStack();
