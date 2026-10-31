@@ -63,19 +63,27 @@ public final class TargetHpConfigScreen extends Screen {
                 () -> config.boss.spacing, v -> config.boss.spacing = (int) Math.round(v)));
 
         int buttonY = rowY + ROW_HEIGHT + 12;
-        int buttonWidth = 92;
-        int gap = 6;
-        int totalWidth = buttonWidth * 4 + gap * 3;
+        int buttonWidth = 76;
+        int gap = 4;
+        int totalWidth = buttonWidth * 5 + gap * 4;
         int buttonX = centerX - totalWidth / 2;
 
         addDrawableChild(ButtonWidget.builder(Text.literal("配置をドラッグ"), b -> openLayoutEditor())
                 .dimensions(buttonX, buttonY, buttonWidth, WIDGET_HEIGHT).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("色設定..."), b -> openColorScreen())
                 .dimensions(buttonX + buttonWidth + gap, buttonY, buttonWidth, WIDGET_HEIGHT).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("初期値に戻す"), b -> resetDefaults())
+        addDrawableChild(ButtonWidget.builder(Text.literal("表示設定..."), b -> openDisplayScreen())
                 .dimensions(buttonX + (buttonWidth + gap) * 2, buttonY, buttonWidth, WIDGET_HEIGHT).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("完了"), b -> close())
+        addDrawableChild(ButtonWidget.builder(Text.literal("初期値に戻す"), b -> resetDefaults())
                 .dimensions(buttonX + (buttonWidth + gap) * 3, buttonY, buttonWidth, WIDGET_HEIGHT).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("完了"), b -> close())
+                .dimensions(buttonX + (buttonWidth + gap) * 4, buttonY, buttonWidth, WIDGET_HEIGHT).build());
+    }
+
+    private void openDisplayScreen() {
+        if (this.client != null) {
+            this.client.setScreen(new DisplayConfigScreen(this));
+        }
     }
 
     private void openLayoutEditor() {

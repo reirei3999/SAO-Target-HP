@@ -20,6 +20,7 @@ public final class SaoConfig {
 
     private static SaoConfig instance;
 
+    public Display display = new Display();
     public MobBar mob = new MobBar();
     public BossBar boss = new BossBar();
 
@@ -39,8 +40,9 @@ public final class SaoConfig {
     }
 
     private static SaoConfig load() {
+        boolean created = !Files.exists(PATH);
         SaoConfig cfg = null;
-        if (Files.exists(PATH)) {
+        if (!created) {
             try (BufferedReader reader = Files.newBufferedReader(PATH, StandardCharsets.UTF_8)) {
                 cfg = GSON.fromJson(reader, SaoConfig.class);
             } catch (Exception ignored) {
@@ -53,11 +55,19 @@ public final class SaoConfig {
         if (cfg.mob == null) {
             cfg.mob = new MobBar();
         }
+        if (cfg.display == null) {
+            cfg.display = new Display();
+        }
         if (cfg.boss == null) {
             cfg.boss = new BossBar();
         }
         cfg.normalize();
-        cfg.save();
+        // Only touch the disk when the file did not exist yet. The old code rewrote the
+        // config on every load, which put a synchronous file write on the render thread
+        // the first time the HUD was drawn.
+        if (created) {
+            cfg.save();
+        }
         return cfg;
     }
 
@@ -74,6 +84,7 @@ public final class SaoConfig {
     }
 
     public void resetToDefaults() {
+        display = new Display();
         mob = new MobBar();
         boss = new BossBar();
         save();
@@ -81,6 +92,9 @@ public final class SaoConfig {
 
     /** Clamps every value into its supported range and refreshes the cached colours. */
     public void normalize() {
+        if (display == null) {
+            display = new Display();
+        }
         mob.sanitize();
         boss.sanitize();
         mob.resolveColors();
@@ -130,6 +144,21 @@ public final class SaoConfig {
         } catch (NumberFormatException ignored) {
             return false;
         }
+    }
+
+    /** Master switches. Turning things off also skips the per-tick target search. */
+    public static final class Display {
+        /** Master switch for the whole HUD. */
+        public boolean enabled = true;
+        /** Draw the mob target gauge and pin. */
+        public boolean mobBar = true;
+        /** Draw the boss bars. */
+        public boolean bossBar = true;
+        /**
+         * Keep the HUD visible while the vanilla HUD is hidden with F1.
+         * When false, F1 hides this mod's gauges as well.
+         */
+        public boolean showWhenHudHidden = false;
     }
 
     public static final class MobBar {
