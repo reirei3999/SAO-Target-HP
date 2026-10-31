@@ -229,8 +229,9 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         // the sky/world never shows through the tapered tail, which reads as washed out
         // when the trail is blended against a bright background.
         if (trailRight > left + 0.001f) {
+            float trailWidth = trailRight - left;
             drawBeveledBar(consumer, matrices, left, trailRight, top, bottom,
-                    Math.min(taper, (trailRight - left) * 0.85f), 0.014f,
+                    tipBevel(trailWidth, taper), 0.014f,
                     withAlpha(settings.trailArgb, alpha));
         }
 
@@ -249,21 +250,33 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         }
 
         if (liveRight > left + 0.001f) {
-            float liveTaper = Math.min(taper, (liveRight - left) * 0.85f);
+            float liveWidth = liveRight - left;
+            float liveTaper = tipBevel(liveWidth, taper);
             drawBeveledBar(consumer, matrices, left, liveRight, top, bottom, liveTaper, 0.016f,
                     withAlpha(fillColor, alpha));
 
             // Flat top sheen, matching the highlight band in the reference.
             float sheenBottom = top - barHeight * 0.34f;
             drawBeveledBar(consumer, matrices, left, liveRight, top, sheenBottom,
-                    Math.min(liveTaper, (liveRight - left) * 0.85f), 0.018f,
-                    withAlpha(highlightColor, alpha * 0.72f));
+                    liveTaper, 0.018f, withAlpha(highlightColor, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
             drawBeveledBar(consumer, matrices, left, right, top, top - barHeight * 0.30f,
                     taper, 0.020f, withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
         }
+    }
+
+    /**
+     * Horizontal run of the leading diagonal. The reference tip is kept while the fill is
+     * wide enough; as the fill approaches the tip width the bevel fades to zero so the gauge
+     * stays a full-height sliver instead of collapsing into a near-vertical top-only wedge.
+     */
+    private static float tipBevel(float width, float taper) {
+        if (width <= taper) {
+            return 0.0f;
+        }
+        return taper * Math.min(1.0f, (width - taper) / (taper * 0.6f));
     }
 
     private static void drawBeveledBar(VertexConsumer consumer, MatrixStack matrices,

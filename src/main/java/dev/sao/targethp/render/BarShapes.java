@@ -23,8 +23,12 @@ public final class BarShapes {
         int bevel = Math.max(2, Math.round(height * taperFactor));
         int fillWidth = Math.round(width * Math.min(1.0f, percent));
         int fillRight = left + fillWidth;
-        // The fill keeps the same angled tip as the frame so the edge never looks square.
-        float fillBevel = Math.min(bevel, fillWidth * 0.85f);
+        // Keep the shallow tip while there is room. Once the remaining fill is barely
+        // wider than the tip the diagonal would shrink to a near-vertical slit, so it
+        // fades out to a straight edge instead of collapsing into a top-only wedge.
+        float tipBlend = fillWidth <= bevel ? 0.0f
+                : Math.min(1.0f, (fillWidth - bevel) / (bevel * 0.6f));
+        int fillBevel = Math.round(bevel * tipBlend);
 
         for (int row = 0; row < height; row++) {
             float progress = height == 1 ? 0.0f : row / (float) (height - 1);
