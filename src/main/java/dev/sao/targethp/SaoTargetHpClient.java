@@ -225,11 +225,13 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         float trailRight = left + barWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
         float liveRight = left + barWidth * hp;
 
-        // Retained damage trail, kept just behind the live fill.
+        // Retained damage trail, kept just behind the live fill. It is drawn opaque so
+        // the sky/world never shows through the tapered tail, which reads as washed out
+        // when the trail is blended against a bright background.
         if (trailRight > left + 0.001f) {
             drawBeveledBar(consumer, matrices, left, trailRight, top, bottom,
                     Math.min(taper, (trailRight - left) * 0.85f), 0.014f,
-                    withAlpha(settings.trailArgb, alpha * 0.72f));
+                    withAlpha(settings.trailArgb, alpha));
         }
 
         // Use the target's current HP for the warning colour, while retaining the smooth fill animation.

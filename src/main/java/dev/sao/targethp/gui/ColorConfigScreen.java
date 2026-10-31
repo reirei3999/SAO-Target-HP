@@ -108,12 +108,12 @@ public final class ColorConfigScreen extends Screen {
         config.save();
     }
 
-    /** Resolves a hex string to the colour used for the field text; invalid input stays neutral. */
+    /** Resolves a hex string to the colour used for the field text; invalid input is shown in grey. */
     private static int tintOf(String raw) {
         if (!SaoConfig.isValidColor(raw)) {
-            return 0xFFFFFFFF;
+            return 0xFF9E9E9E;
         }
-        return SaoConfig.parseColor(raw, 0xFFFFFFFF);
+        return SaoConfig.parseColor(raw, 0xFF9E9E9E);
     }
 
     @Override
@@ -168,6 +168,9 @@ public final class ColorConfigScreen extends Screen {
      * would vanish on the vanilla black field, so the backdrop flips to light for them.
      */
     private static final class ColorField extends TextFieldWidget {
+        /** Vanilla inner padding on each side of the text. */
+        private static final int PADDING = 4;
+
         private int tint = 0xFFFFFFFF;
 
         private ColorField(TextRenderer textRenderer, int x, int y, int width, int height, Text message) {
@@ -183,6 +186,12 @@ public final class ColorConfigScreen extends Screen {
         }
 
         @Override
+        public int getInnerWidth() {
+            // Without a background TextFieldWidget drops its padding; keep the vanilla width.
+            return getWidth() - PADDING * 2;
+        }
+
+        @Override
         public void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
             int red = (this.tint >> 16) & 0xFF;
             int green = (this.tint >> 8) & 0xFF;
@@ -195,7 +204,12 @@ public final class ColorConfigScreen extends Screen {
             context.fill(getX() - 1, getY() - 1, getX() + getWidth() + 1, getY() + getHeight() + 1, border);
             context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), background);
 
+            // The widget skips its 4px padding when the background is off, which would glue
+            // the text to the top-left corner; shift the matrix back to the vanilla position.
+            context.getMatrices().push();
+            context.getMatrices().translate(PADDING, (getHeight() - 8) / 2.0f, 0.0f);
             super.renderWidget(context, mouseX, mouseY, delta);
+            context.getMatrices().pop();
         }
     }
 }
