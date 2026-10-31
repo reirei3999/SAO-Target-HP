@@ -268,15 +268,12 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     }
 
     /**
-     * Horizontal run of the leading diagonal. The reference tip is kept while the fill is
-     * wide enough; as the fill approaches the tip width the bevel fades to zero so the gauge
-     * stays a full-height sliver instead of collapsing into a near-vertical top-only wedge.
+     * Horizontal run of the leading diagonal. The reference tip angle is kept for every
+     * fill level, so a nearly dead target simply shrinks to a sliver at the bar's start
+     * instead of the tip flattening into a vertical edge.
      */
     private static float tipBevel(float width, float taper) {
-        if (width <= taper) {
-            return 0.0f;
-        }
-        return taper * Math.min(1.0f, (width - taper) / (taper * 0.6f));
+        return Math.min(taper, width);
     }
 
     private static void drawBeveledBar(VertexConsumer consumer, MatrixStack matrices,
