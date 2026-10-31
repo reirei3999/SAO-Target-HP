@@ -1,13 +1,18 @@
 package dev.sao.targethp;
 
+import dev.sao.targethp.config.SaoConfig;
+import dev.sao.targethp.gui.TargetHpConfigScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.Camera;
+import net.minecraft.client.util.InputUtil;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.SpawnGroup;
@@ -37,14 +42,25 @@ public final class SaoTargetHpClient implements ClientModInitializer {
     private static float damageTrail;
     private static float hitFlash;
     private static float acquirePulse;
+    private static KeyBinding settingsKey;
 
     @Override
     public void onInitializeClient() {
+        settingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.saotargethp.settings",
+                InputUtil.Type.KEYSYM,
+                org.lwjgl.glfw.GLFW.GLFW_KEY_K,
+                "key.categories.misc"));
+
         ClientTickEvents.END_CLIENT_TICK.register(SaoTargetHpClient::tick);
         WorldRenderEvents.AFTER_ENTITIES.register(SaoTargetHpClient::renderTargetPin);
     }
 
     private static void tick(MinecraftClient client) {
+        while (settingsKey != null && settingsKey.wasPressed()) {
+            client.setScreen(new TargetHpConfigScreen(client.currentScreen));
+        }
+
         LivingEntity next = findTarget(client);
 
         if (next != null) {
@@ -160,9 +176,12 @@ public final class SaoTargetHpClient implements ClientModInitializer {
         VertexConsumer consumer = consumers.getBuffer(RenderLayer.getDebugQuads());
 
         // Offset the gauge 1.5 blocks downward in world space, then rotate it to face the player.
+        // The user configured offset is applied in the camera-facing plane afterwards.
+        SaoConfig.MobBar settings = SaoConfig.get().mob;
         matrices.push();
         matrices.translate(x, y - HEALTH_BAR_VERTICAL_OFFSET, z);
         matrices.multiply(camera.getRotation());
+        matrices.translate(settings.offsetX, settings.offsetY, 0.0D);
         drawTargetHealthBar(consumer, matrices, size);
         matrices.pop();
 
@@ -185,6 +204,7 @@ public final class SaoTargetHpClient implements ClientModInitializer {
      * outline, a flat green body, and a shallow diagonal cut at the right tip.
      */
     private static void drawTargetHealthBar(VertexConsumer consumer, MatrixStack matrices, float pinSize) {
+        SaoConfig.MobBar settings = SaoConfig.get().mob;
         float barWidth = pinSize * 9.6f;
         float barHeight = pinSize * 0.68f;
         float gap = pinSize * 0.46f;
@@ -197,49 +217,63 @@ public final class SaoTargetHpClient implements ClientModInitializer {
 
         // Dark frame first, then the recessed interior, so the outline stays thin and even.
         drawBeveledBar(consumer, matrices, left - rim, right + rim, top + rim, bottom - rim,
-                taper + rim, 0.010f, withAlpha(0xE8000000, alpha));
+                taper + rim, 0.010f, withAlpha(settings.outlineArgb, alpha));
         drawBeveledBar(consumer, matrices, left, right, top, bottom, taper, 0.012f,
-                withAlpha(0xFF162016, alpha));
+                withAlpha(settings.backgroundArgb, alpha));
 
         float hp = Math.max(0.0f, Math.min(1.0f, displayedHealth));
         float trailRight = left + barWidth * Math.max(0.0f, Math.min(1.0f, damageTrail));
         float liveRight = left + barWidth * hp;
 
-        // Retained damage trail, kept just behind the live fill.
+        // Retained damage trail, kept just behind the live fill. It is drawn opaque so
+        // the sky/world never shows through the tapered tail, which reads as washed out
+        // when the trail is blended against a bright background.
         if (trailRight > left + 0.001f) {
+            float trailWidth = trailRight - left;
             drawBeveledBar(consumer, matrices, left, trailRight, top, bottom,
-                    Math.min(taper, (trailRight - left) * 0.85f), 0.014f,
-                    withAlpha(0xFF8F6A2C, alpha * 0.72f));
+                    tipBevel(trailWidth, taper), 0.014f,
+                    withAlpha(settings.trailArgb, alpha));
         }
 
         // Use the target's current HP for the warning colour, while retaining the smooth fill animation.
         float currentHp = target == null ? hp : healthRatio(target);
-        int fillColor = 0xFF58A83B;
-        int highlightColor = 0xFF83D25B;
-        if (currentHp <= 0.20f) {
-            fillColor = 0xFFD9413A;
-            highlightColor = 0xFFFF7666;
-        } else if (currentHp <= 0.40f) {
-            fillColor = 0xFFE0AF32;
-            highlightColor = 0xFFFFDD69;
+        float danger = (float) (settings.dangerThresholdPercent / 100.0D);
+        float caution = (float) (settings.cautionThresholdPercent / 100.0D);
+        int fillColor = settings.normalArgb;
+        int highlightColor = settings.normalHighlightArgb;
+        if (currentHp <= danger) {
+            fillColor = settings.dangerArgb;
+            highlightColor = settings.dangerHighlightArgb;
+        } else if (currentHp <= caution) {
+            fillColor = settings.cautionArgb;
+            highlightColor = settings.cautionHighlightArgb;
         }
 
         if (liveRight > left + 0.001f) {
-            float liveTaper = Math.min(taper, (liveRight - left) * 0.85f);
+            float liveWidth = liveRight - left;
+            float liveTaper = tipBevel(liveWidth, taper);
             drawBeveledBar(consumer, matrices, left, liveRight, top, bottom, liveTaper, 0.016f,
                     withAlpha(fillColor, alpha));
 
             // Flat top sheen, matching the highlight band in the reference.
             float sheenBottom = top - barHeight * 0.34f;
             drawBeveledBar(consumer, matrices, left, liveRight, top, sheenBottom,
-                    Math.min(liveTaper, (liveRight - left) * 0.85f), 0.018f,
-                    withAlpha(highlightColor, alpha * 0.72f));
+                    liveTaper, 0.018f, withAlpha(highlightColor, alpha * 0.72f));
         }
 
         if (hitFlash > 0.02f) {
             drawBeveledBar(consumer, matrices, left, right, top, top - barHeight * 0.30f,
                     taper, 0.020f, withAlpha(0xFFFFFFFF, alpha * hitFlash * 0.30f));
         }
+    }
+
+    /**
+     * Horizontal run of the leading diagonal. The reference tip angle is kept for every
+     * fill level, so a nearly dead target simply shrinks to a sliver at the bar's start
+     * instead of the tip flattening into a vertical edge.
+     */
+    private static float tipBevel(float width, float taper) {
+        return Math.min(taper, width);
     }
 
     private static void drawBeveledBar(VertexConsumer consumer, MatrixStack matrices,
